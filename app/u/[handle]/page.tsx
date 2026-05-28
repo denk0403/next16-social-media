@@ -1,17 +1,14 @@
-import { Suspense } from 'react';
 import { Crossfade } from '@/components/ui/crossfade';
 import { PageHeader } from '@/components/ui/page-header';
 import { TabsSkeleton } from '@/components/ui/tabs';
 import { DropListSkeleton } from '@/features/drop/components/drop';
 import { ProfileFeed } from '@/features/user/components/profile-feed';
 import { ProfileHeader, ProfileHeaderSkeleton } from '@/features/user/components/profile-header';
-import { ProfileTabs, type ProfileTab } from '@/features/user/components/profile-tabs';
+import { ProfileTabs } from '@/features/user/components/profile-tabs';
 import { getUserByHandle } from '@/features/user/user-queries';
+import { parseProfileTab } from '@/lib/parseProfileTab';
 import type { Metadata } from 'next';
-
-function parseTab(value: string | string[] | undefined): ProfileTab {
-  return value === 'replies' ? 'replies' : 'drops';
-}
+import { Suspense } from 'react';
 
 export async function generateMetadata({ params }: PageProps<'/u/[handle]'>): Promise<Metadata> {
   const { handle } = await params;
@@ -42,17 +39,17 @@ export default function ProfilePage({ params, searchParams }: PageProps<'/u/[han
       <Suspense fallback={<TabsSkeleton />}>
         <Crossfade>
           {Promise.all([params, searchParams]).then(([{ handle }, sp]) => (
-            <ProfileTabs handle={handle} active={parseTab(sp.tab)} />
+            <ProfileTabs handle={handle} />
           ))}
         </Crossfade>
       </Suspense>
       <Suspense fallback={<DropListSkeleton />}>
         {Promise.all([params, searchParams]).then(([{ handle }, sp]) => {
-          const tab = parseTab(sp.tab);
+          const tab = parseProfileTab(Array.isArray(sp.tab) ? sp.tab[0] : (sp.tab ?? ''));
           return (
             <Suspense key={tab} fallback={<DropListSkeleton />}>
               <Crossfade>
-                <ProfileFeed handle={handle} tab={tab} />
+              <ProfileFeed handle={handle} tab={tab} />
               </Crossfade>
             </Suspense>
           )
