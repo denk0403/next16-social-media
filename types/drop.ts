@@ -1,4 +1,4 @@
-import type { Drop as PrismaDrop } from '@/generated/prisma/client';
+import type { DbDrop } from '@/lib/db-types';
 
 export type Drop = {
   id: string;
@@ -13,7 +13,7 @@ export type Drop = {
   parentId?: string;
 };
 
-export function toDrop(row: PrismaDrop): Drop {
+export function toDrop(row: DbDrop): Drop {
   return {
     authorHandle: row.authorHandle,
     body: row.body,
