@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Tabs } from '@/components/ui/tabs';
 import type { Route } from 'next';
+import { useEffect } from 'react';
 
 type FeedTab = 'following' | 'discover';
 
@@ -19,6 +20,12 @@ export function FeedTabs() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const active = parseTab(searchParams.get('tab'));
+
+  useEffect(function prefetchTabs() {
+    FEED_TABS.forEach(t => {
+      router.prefetch((t.value === 'following' ? '/' : '/?tab=discover') as Route);
+    });
+  }, [router]);
 
   return (
     <Tabs
