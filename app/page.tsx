@@ -20,21 +20,23 @@ function parsePage(value: string | string[] | undefined): number {
 
 export default function HomePage({ searchParams }: PageProps<'/'>) {
   return (
-    <div>
+    <div className="group/tabs">
       <PageHeader title="Home" />
       <Suspense fallback={<TabsSkeleton />}>
         <FeedTabs />
       </Suspense>
       <DropComposer />
-      <Suspense fallback={<DropListSkeleton />}>
-        <Crossfade>
-          {searchParams.then(sp => {
-            const tab = parseTab(sp.tab);
-            const page = parsePage(sp.page);
-            return tab === 'discover' ? <DiscoverFeed page={page} /> : <Feed page={page} />;
-          })}
-        </Crossfade>
-      </Suspense>
+      <div className="transition-opacity group-has-data-pending/tabs:opacity-50">
+        <Suspense fallback={<DropListSkeleton />}>
+          <Crossfade>
+            {searchParams.then(sp => {
+              const tab = parseTab(sp.tab);
+              const page = parsePage(sp.page);
+              return tab === 'discover' ? <DiscoverFeed page={page} /> : <Feed page={page} />;
+            })}
+          </Crossfade>
+        </Suspense>
+      </div>
     </div>
   );
 }

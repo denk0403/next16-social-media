@@ -30,7 +30,7 @@ export const unstable_prefetch = 'force-runtime';
 
 export default function ProfilePage({ params, searchParams }: PageProps<'/u/[handle]'>) {
   return (
-    <div>
+    <div className="group/tabs">
       <PageHeader title="Profile" />
       <Suspense fallback={<ProfileHeaderSkeleton />}>
         <Crossfade>
@@ -46,13 +46,15 @@ export default function ProfilePage({ params, searchParams }: PageProps<'/u/[han
           ))}
         </Crossfade>
       </Suspense>
-      <Suspense fallback={<DropListSkeleton />}>
-        <Crossfade>
-          {Promise.all([params, searchParams]).then(([{ handle }, sp]) => (
-            <ProfileFeed handle={handle} tab={parseTab(sp.tab)} />
-          ))}
-        </Crossfade>
-      </Suspense>
+      <div className="transition-opacity group-has-data-pending/tabs:opacity-50">
+        <Suspense fallback={<DropListSkeleton />}>
+          <Crossfade>
+            {Promise.all([params, searchParams]).then(([{ handle }, sp]) => (
+              <ProfileFeed handle={handle} tab={parseTab(sp.tab)} />
+            ))}
+          </Crossfade>
+        </Suspense>
+      </div>
     </div>
   );
 }

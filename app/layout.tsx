@@ -87,18 +87,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
 function AppGrid({ children }: { children: React.ReactNode }) {
   return (
-    <div className="group mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 sm:grid-cols-[4.5rem_minmax(0,1fr)] lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,38rem)_20rem]">
+    <div className="mx-auto grid w-full max-w-7xl flex-1 grid-cols-1 sm:grid-cols-[4.5rem_minmax(0,1fr)] lg:grid-cols-[17.5rem_minmax(0,1fr)] xl:grid-cols-[17.5rem_minmax(0,38rem)_20rem]">
       {children}
     </div>
   );
 }
 
 function MainColumn({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="sm:border-divider/70 dark:sm:border-divider-dark/70 min-w-0 transition-opacity group-has-data-pending:opacity-50 sm:border-x">
-      {children}
-    </main>
-  );
+  return <main className="sm:border-divider/70 dark:sm:border-divider-dark/70 min-w-0 transition-opacity peer-has-data-pending:opacity-50 sm:border-x">{children}</main>;
 }
 
 function RightSidebar({ children }: { children: React.ReactNode }) {

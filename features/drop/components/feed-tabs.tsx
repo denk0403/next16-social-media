@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTransition } from 'react';
 import { Tabs } from '@/components/ui/tabs';
 import type { Route } from 'next';
 
@@ -19,15 +20,21 @@ export function FeedTabs() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const active = parseTab(searchParams.get('tab'));
+  const [isPending, startTransition] = useTransition();
 
   return (
-    <Tabs
-      tabs={FEED_TABS}
-      active={active}
-      action={value => {
-        router.push((value === 'following' ? '/' : '/?tab=discover') as Route);
-      }}
-      label="Feed sections"
-    />
+    <div data-pending={isPending ? '' : undefined}>
+      <Tabs
+        tabs={FEED_TABS}
+        active={active}
+        action={value => {
+          startTransition(() => {
+            router.push((value === 'following' ? '/' : '/?tab=discover') as Route);
+          });
+        }}
+        href={value => (value === 'following' ? '/' : '/?tab=discover') as Route}
+        label="Feed sections"
+      />
+    </div>
   );
 }

@@ -20,7 +20,7 @@ export function Sidebar() {
   return (
     <aside
       style={{ viewTransitionName: 'sidebar' }}
-      className="sticky top-0 hidden h-dvh flex-col items-center gap-4 overflow-y-auto overscroll-y-contain px-2 py-5 sm:flex lg:items-stretch lg:px-6"
+      className="peer group/sidebar sticky top-0 hidden h-dvh flex-col items-center gap-4 overflow-y-auto overscroll-y-contain px-2 py-5 sm:flex lg:items-stretch lg:px-6"
     >
       <Link
         href="/"

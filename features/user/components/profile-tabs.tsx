@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useTransition } from 'react';
 import { Tabs } from '@/components/ui/tabs';
 import type { Route } from 'next';
 
@@ -13,15 +14,21 @@ const PROFILE_TABS: { label: string; value: ProfileTab }[] = [
 
 export function ProfileTabs({ handle, active }: { handle: string; active: ProfileTab }) {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   return (
-    <Tabs
-      tabs={PROFILE_TABS}
-      active={active}
-      action={value => {
-        router.push(`/u/${handle}${value === 'drops' ? '' : `?tab=${value}`}` as Route);
-      }}
-      label="Profile sections"
-    />
+    <div data-pending={isPending ? '' : undefined}>
+      <Tabs
+        tabs={PROFILE_TABS}
+        active={active}
+        action={value => {
+          startTransition(() => {
+            router.push(`/u/${handle}${value === 'drops' ? '' : `?tab=${value}`}` as Route);
+          });
+        }}
+        href={value => `/u/${handle}${value === 'drops' ? '' : `?tab=${value}`}` as Route}
+        label="Profile sections"
+      />
+    </div>
   );
 }
