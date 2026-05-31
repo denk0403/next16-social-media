@@ -1,16 +1,20 @@
 # Next 16 Social Media "Drop"
 
-A dev-flavored social network demo exploring Async React, Cache Components, and streaming with Next.js 16, React 19, Tailwind CSS v4, Prisma 7 on Neon Postgres, and Shiki for server-side syntax highlighting.
+A dev-flavored social network built with Next.js 16, React 19, Tailwind CSS v4, Prisma 7 on Neon Postgres, and Shiki for server-side syntax highlighting.
 
-The architecture follows the [Next.js App Architecture](.agents/skills/nextjs-app-architecture/SKILL.md) skill.
+The architecture follows the [Next.js App Architecture](.agents/skills/nextjs-app-architecture/SKILL.md) skill and the [Component Architecture for React Server Components](https://aurorascharff.no/posts/component-architecture-for-react-server-components/) blog post.
 
-## Key Patterns
+## Architecture
 
-- **Cache Components** — `cacheComponents: true` builds a static shell at build time; dynamic content streams in behind `<Suspense>` boundaries
-- **Feature-sliced structure** — each domain (`drop/`, `user/`, `tag/`) owns its queries (`'use cache'`), actions (`'use server'`), and components
-- **Pages are composition only** — they wrap feature components in Suspense, never fetch data directly
-- **Optimistic UI** — `useOptimistic` + `startTransition` for instant feedback, `toast` for action results
-- **Runtime prefetch** — all pages export `unstable_prefetch = 'force-runtime'` for instant navigations backed by fresh data
+- **Feature-sliced structure**: `drop/`, `user/`, `tag/` each own queries, actions, and components
+- **Components own their data**: `<Feed>`, `<DropDetail>`, `<TrendingTagsList>` fetch on the server. Move them between pages freely
+- **Pages compose, they don't fetch**: each page is a synchronous blueprint of async components wrapped in Suspense
+- **Client boundaries as leaf nodes**: `'use client'` pushed deep. Server content flows into client components as children
+
+## Caching and Navigation
+
+- **Cache Components**: `'use cache'` per query, not per page. A feed caches for seconds, trending tags for minutes, user-specific data with `'use cache: private'`. `cacheTag` names data, `updateTag` invalidates both server and browser cache
+- **Runtime prefetching**: all pages export `unstable_prefetch = 'force-runtime'` so the framework prefetches cached dynamic data ahead of time, making even database-driven pages instant on click
 
 ## Getting Started
 

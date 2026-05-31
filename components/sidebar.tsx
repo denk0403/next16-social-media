@@ -1,4 +1,4 @@
-import { Bookmark, Home, Search, TrendingUp, User } from 'lucide-react';
+import { Bell, Bookmark, Home, Search, User } from 'lucide-react';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
@@ -8,6 +8,7 @@ import ErrorBoundary from '@/components/ui/error-boundary';
 import { NavLink, NavLinkSkeleton } from '@/components/ui/nav-link';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NewDropModal } from '@/features/drop/components/composer-modal';
+import { NotificationsBadge } from '@/features/notifications/components/notifications-badge';
 import { CurrentUserAvatar, UserAvatarSkeleton } from '@/features/user/components/user-avatar';
 import { UserSwitcher } from '@/features/user/components/user-switcher';
 import { getAllUsers, getCurrentUser, getCurrentUserHandle } from '@/features/user/user-queries';
@@ -30,7 +31,14 @@ export function Sidebar() {
         <DropMark size={28} className="text-black dark:text-white" />
         <span className="hidden lg:inline">drop</span>
       </Link>
-      <nav className="flex flex-col gap-1.5 text-sm font-medium">
+      <div className="hidden lg:block">
+        <ErrorBoundary title="Your profile is offline" compact>
+          <Suspense fallback={<SidebarProfilePillSkeleton />}>
+            <SidebarProfilePill />
+          </Suspense>
+        </ErrorBoundary>
+      </div>
+      <nav className="flex flex-1 flex-col gap-1.5 text-sm font-medium">
         <NavLink href="/" aria-label="Home" className={sidebarLinkClass}>
           <Home className="h-5 w-5" />
           <span className="hidden lg:inline">Home</span>
@@ -43,9 +51,12 @@ export function Sidebar() {
           <Bookmark className="h-5 w-5" />
           <span className="hidden lg:inline">Bookmarks</span>
         </NavLink>
-        <NavLink href="/tag" aria-label="Trending" className={sidebarLinkClass}>
-          <TrendingUp className="h-5 w-5" />
-          <span className="hidden lg:inline">Trending</span>
+        <NavLink href="/notifications" aria-label="Activity" className={sidebarLinkClass}>
+          <Bell className="h-5 w-5" />
+          <span className="hidden lg:inline">Activity</span>
+          <Suspense>
+            <NotificationsBadge />
+          </Suspense>
         </NavLink>
         <Suspense
           fallback={
@@ -62,22 +73,17 @@ export function Sidebar() {
             </NavLink>
           ))}
         </Suspense>
+        <div className="hidden pt-2 lg:block">
+          <NewDropModal
+            avatar={
+              <Suspense fallback={<UserAvatarSkeleton size="md" />}>
+                <CurrentUserAvatar />
+              </Suspense>
+            }
+          />
+        </div>
       </nav>
-      <div className="hidden pt-2 lg:block">
-        <NewDropModal
-          avatar={
-            <Suspense fallback={<UserAvatarSkeleton size="md" />}>
-              <CurrentUserAvatar />
-            </Suspense>
-          }
-        />
-      </div>
-      <div className="mt-auto hidden lg:block">
-        <ErrorBoundary title="Your profile is offline" compact>
-          <Suspense fallback={<SidebarProfilePillSkeleton />}>
-            <SidebarProfilePill />
-          </Suspense>
-        </ErrorBoundary>
+      <div className="hidden lg:block">
         <SidebarFooter />
       </div>
     </aside>
@@ -86,19 +92,17 @@ export function Sidebar() {
 
 function SidebarFooter() {
   return (
-    <div className="border-divider dark:border-divider-dark mt-3 border-t pt-3">
-      <div className="flex items-center justify-between px-2">
-        <ThemeToggle variant="inline" />
-        <a
-          href="https://github.com/aurorascharff/next16-social-media"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-gray rounded-full p-1.5 transition-colors hover:text-black dark:hover:text-white"
-          aria-label="View source on GitHub"
-        >
-          <GitHubIcon className="h-5 w-5" />
-        </a>
-      </div>
+    <div className="flex items-center justify-between px-2">
+      <ThemeToggle variant="inline" />
+      <a
+        href="https://github.com/aurorascharff/next16-social-media"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-gray rounded-full p-1.5 transition-colors hover:text-black dark:hover:text-white"
+        aria-label="View source on GitHub"
+      >
+        <GitHubIcon className="h-5 w-5" />
+      </a>
     </div>
   );
 }

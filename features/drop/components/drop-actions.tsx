@@ -92,7 +92,7 @@ export function DropActions({ dropId, parentId, replies, reposts, likes, userSta
         <span>{formatCount(likes + optimistic.likesDelta)}</span>
       </IconButton>
       <IconButton
-        label="Bookmark"
+        label={optimistic.bookmarked ? 'Saved' : 'Save for later'}
         icon={<Bookmark className={cn('h-4 w-4', optimistic.bookmarked && 'fill-current')} />}
         active={optimistic.bookmarked}
         activeColor="text-accent"
@@ -100,7 +100,9 @@ export function DropActions({ dropId, parentId, replies, reposts, likes, userSta
         onClick={() => {
           toggle('bookmarked', () => toggleBookmark(dropId));
         }}
-      />
+      >
+        <span className="hidden sm:inline">{optimistic.bookmarked ? 'Saved' : 'Save'}</span>
+      </IconButton>
     </div>
   );
 }

@@ -10,6 +10,7 @@ async function main() {
   const prisma = new PrismaClient({ adapter });
 
   console.log('Clearing existing data...');
+  await prisma.notification.deleteMany();
   await prisma.like.deleteMany();
   await prisma.repost.deleteMany();
   await prisma.bookmark.deleteMany();
@@ -79,6 +80,74 @@ async function main() {
     for (const dropId of drops) {
       await prisma.bookmark.create({ data: { dropId, userHandle: user } });
     }
+  }
+
+  console.log('Backfilling notifications from existing activity...');
+  const dropsForNotifs = await prisma.drop.findMany({
+    select: { authorHandle: true, body: true, id: true, parentId: true },
+  });
+  const dropById = new Map(dropsForNotifs.map(d => [d.id, d]));
+
+  // Likes
+  const allLikes = await prisma.like.findMany();
+  for (const like of allLikes) {
+    const drop = dropById.get(like.dropId);
+    if (!drop || drop.authorHandle === like.userHandle) continue;
+    await prisma.notification.create({
+      data: {
+        actorHandle: like.userHandle,
+        createdAt: like.createdAt,
+        dropId: like.dropId,
+        kind: 'like',
+        readAt: like.createdAt,
+        recipientHandle: drop.authorHandle,
+      },
+    });
+  }
+  // Reposts
+  const allReposts = await prisma.repost.findMany();
+  for (const repost of allReposts) {
+    const drop = dropById.get(repost.dropId);
+    if (!drop || drop.authorHandle === repost.userHandle) continue;
+    await prisma.notification.create({
+      data: {
+        actorHandle: repost.userHandle,
+        createdAt: repost.createdAt,
+        dropId: repost.dropId,
+        kind: 'repost',
+        readAt: repost.createdAt,
+        recipientHandle: drop.authorHandle,
+      },
+    });
+  }
+  // Follows
+  const allFollows = await prisma.follow.findMany();
+  for (const follow of allFollows) {
+    await prisma.notification.create({
+      data: {
+        actorHandle: follow.followerHandle,
+        createdAt: follow.createdAt,
+        kind: 'follow',
+        readAt: follow.createdAt,
+        recipientHandle: follow.targetHandle,
+      },
+    });
+  }
+  // Replies
+  for (const reply of dropsForNotifs) {
+    if (!reply.parentId) continue;
+    const parent = dropById.get(reply.parentId);
+    if (!parent || parent.authorHandle === reply.authorHandle) continue;
+    await prisma.notification.create({
+      data: {
+        actorHandle: reply.authorHandle,
+        body: reply.body,
+        dropId: reply.parentId,
+        kind: 'reply',
+        readAt: new Date(),
+        recipientHandle: parent.authorHandle,
+      },
+    });
   }
 
   console.log(`Seeded ${USERS.length} users, ${DROPS.length + REPLIES.length} drops`);

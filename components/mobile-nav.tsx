@@ -1,4 +1,4 @@
-import { Bookmark, Home, Search, TrendingUp, User } from 'lucide-react';
+import { Bell, Bookmark, Home, Search, User } from 'lucide-react';
 import { Suspense } from 'react';
 import { NavLink, NavLinkSkeleton } from '@/components/ui/nav-link';
 import { getCurrentUserHandle } from '@/features/user/user-queries';
@@ -22,9 +22,9 @@ export function MobileTabBar() {
         <Search className="h-5 w-5" />
         <span>Search</span>
       </NavLink>
-      <NavLink href="/tag" aria-label="Trending" className={mobileTabClass}>
-        <TrendingUp className="h-5 w-5" />
-        <span>Trending</span>
+      <NavLink href={'/notifications' as Route} aria-label="Activity" className={mobileTabClass}>
+        <Bell className="h-5 w-5" />
+        <span>Activity</span>
       </NavLink>
       <NavLink href="/bookmarks" aria-label="Saved" className={mobileTabClass}>
         <Bookmark className="h-5 w-5" />

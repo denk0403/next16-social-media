@@ -39,6 +39,10 @@ export async function toggleFollow(targetHandle: string) {
       prisma.user.update({ data: { following: { increment: 1 } }, where: { handle: me } }),
       prisma.user.update({ data: { followers: { increment: 1 } }, where: { handle: target } }),
     ]);
+    await prisma.notification.create({
+      data: { actorHandle: me, kind: 'follow', recipientHandle: target },
+    });
+    updateTag('notifications');
   }
   updateTag(`user-${target}`);
   updateTag(`user-${me}`);

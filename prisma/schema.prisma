@@ -8,14 +8,14 @@ datasource db {
 }
 
 model User {
-  id          String     @id @default(cuid())
-  handle      String     @unique
+  id          String   @id @default(cuid())
+  handle      String   @unique
   displayName String
   bio         String
   avatarColor String
-  followers   Int        @default(0)
-  following   Int        @default(0)
-  createdAt   DateTime   @default(now())
+  followers   Int      @default(0)
+  following   Int      @default(0)
+  createdAt   DateTime @default(now())
 
   drops      Drop[]
   likes      Like[]
@@ -97,4 +97,17 @@ model Follow {
   @@id([followerHandle, targetHandle])
   @@index([followerHandle])
   @@index([targetHandle])
+}
+
+model Notification {
+  id              String    @id @default(cuid())
+  recipientHandle String
+  actorHandle     String
+  kind            String
+  dropId          String?
+  body            String?
+  createdAt       DateTime  @default(now())
+  readAt          DateTime?
+
+  @@index([recipientHandle, createdAt])
 }

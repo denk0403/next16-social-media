@@ -99,6 +99,19 @@
   }
 }
 
+@keyframes flash-in {
+  0% {
+    background-color: color-mix(in oklab, var(--color-blue-500) 18%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.flash-in {
+  animation: flash-in 1.2s ease-out;
+}
+
 /* Exclude persistent elements from view transition animations */
 ::view-transition-group(mobile-nav),
 ::view-transition-group(sidebar),

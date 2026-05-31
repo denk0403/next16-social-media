@@ -1,6 +1,5 @@
 import { Suspense } from 'react';
 import { Crossfade } from '@/components/ui/crossfade';
-import { PageHeader } from '@/components/ui/page-header';
 import { TabsSkeleton } from '@/components/ui/tabs';
 import { DropComposer } from '@/features/drop/components/composer';
 import { DropListSkeleton } from '@/features/drop/components/drop';
@@ -21,10 +20,11 @@ function parsePage(value: string | string[] | undefined): number {
 export default function HomePage({ searchParams }: PageProps<'/'>) {
   return (
     <div className="group/tabs">
-      <PageHeader title="Home" />
-      <Suspense fallback={<TabsSkeleton />}>
-        <FeedTabs />
-      </Suspense>
+      <div className="sticky top-0 z-30 bg-white/70 backdrop-blur-md backdrop-saturate-150 dark:bg-black/70">
+        <Suspense fallback={<TabsSkeleton />}>
+          <FeedTabs />
+        </Suspense>
+      </div>
       <DropComposer />
       <div className="transition-opacity group-has-data-pending/tabs:opacity-50">
         <Suspense fallback={<DropListSkeleton />}>

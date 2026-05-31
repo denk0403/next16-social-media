@@ -75,6 +75,18 @@ export async function postReply(parentId: string, formData: FormData) {
     }),
     prisma.drop.update({ data: { replyCount: { increment: 1 } }, where: { id: parentId } }),
   ]);
+  if (parent.authorHandle !== me) {
+    await prisma.notification.create({
+      data: {
+        actorHandle: me,
+        body: parsed.data.body,
+        dropId: parentId,
+        kind: 'reply',
+        recipientHandle: parent.authorHandle,
+      },
+    });
+    updateTag('notifications');
+  }
   updateTag(`drop-${parentId}`);
   updateTag(`replies-${parentId}`);
   updateTag(`user-replies-${me}`);
@@ -98,6 +110,13 @@ export async function toggleLike(dropId: string) {
       prisma.like.create({ data: { dropId: id, userHandle: me } }),
       prisma.drop.update({ data: { likeCount: { increment: 1 } }, where: { id } }),
     ]);
+    const drop = await prisma.drop.findUnique({ select: { authorHandle: true }, where: { id } });
+    if (drop && drop.authorHandle !== me) {
+      await prisma.notification.create({
+        data: { actorHandle: me, dropId: id, kind: 'like', recipientHandle: drop.authorHandle },
+      });
+      updateTag('notifications');
+    }
   }
   updateTag(`drop-${id}`);
   updateTag(`user-state-${id}`);
@@ -119,6 +138,13 @@ export async function toggleRepost(dropId: string) {
       prisma.repost.create({ data: { dropId: id, userHandle: me } }),
       prisma.drop.update({ data: { repostCount: { increment: 1 } }, where: { id } }),
     ]);
+    const drop = await prisma.drop.findUnique({ select: { authorHandle: true }, where: { id } });
+    if (drop && drop.authorHandle !== me) {
+      await prisma.notification.create({
+        data: { actorHandle: me, dropId: id, kind: 'repost', recipientHandle: drop.authorHandle },
+      });
+      updateTag('notifications');
+    }
   }
   updateTag(`drop-${id}`);
   updateTag(`user-state-${id}`);

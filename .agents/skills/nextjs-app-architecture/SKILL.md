@@ -1,384 +1,283 @@
 ---
 name: nextjs-app-architecture
-description: Architecture patterns for building Next.js 16 App Router applications with React Server Components, Cache Components, Suspense streaming, and feature-sliced design. Use this skill whenever building a new Next.js app, adding a feature to an existing one, refactoring a page or component, scaffolding pages, designing loading states, structuring feature folders, setting up data fetching with caching, creating client/server component boundaries, implementing view transitions, or organizing any content-driven application. Also use when the user asks about RSC composition, Suspense boundaries, skeleton placement, CLS prevention, cache invalidation, or how to structure a Next.js project. Even if the user doesn't mention architecture explicitly, use this skill whenever they're building or modifying a Next.js App Router app to ensure the right patterns are followed from the start.
+description: Architecture patterns for building Next.js 16 App Router applications with React Server Components, Cache Components, Suspense streaming, and feature-sliced design. Use this skill whenever building a new Next.js app, adding a feature to an existing one, refactoring a page or component, scaffolding pages, designing loading states, structuring feature folders, setting up data fetching with caching, or creating client/server component boundaries. Also use when the user asks about RSC composition, Suspense boundaries, skeleton placement, CLS prevention, cache invalidation, or how to structure a Next.js project.
 ---
 
 # Next.js App Architecture
 
-A step-by-step guide for building dynamic Next.js 16+ App Router applications — the kind where every route is server-rendered with streaming, prefetched at runtime, and feels like a single-page app. This is NOT a guide for static sites or fully cached pages — people already know how to do that. This is for apps where most content is dynamic, data changes frequently, and loading states matter.
+Use this skill when building a new Next.js 16+ App Router app or adding/refactoring a feature in an existing one. Follow these steps in order.
 
-This guide targets Next.js 16.2+ with `cacheComponents: true`. Some features (like `unstable_prefetch = 'force-runtime'`) require 16.3+. Check your version and the [bundled docs](https://nextjs.org/docs) to see what's available — API names and stability may differ across minor versions.
+This targets Next.js 16+ with `cacheComponents: true`.
 
-Follow these steps in order — each builds on the previous one. This guide describes patterns, not specific libraries. When working in an existing codebase, use whatever libraries are already there (ORM, validation, toasts, etc.).
+## The model
 
-## Overview
+With `cacheComponents: true`, Next.js builds a static shell at build time and streams dynamic content at request time:
 
-1. **Project Structure** — Set up feature-sliced folders separating queries, actions, and components per domain
-2. **Data Layer** — Build server-only queries with `'use cache'` and server actions with `updateTag` invalidation
-3. **Feature Components** — Create self-contained async components that own their data fetching and export their own skeletons
-4. **Client Boundaries** — Push `'use client'` as deep as possible, group related interactive pieces, keep most components as server components
-5. **Page Composition** — Compose pages from feature components with Suspense boundaries, design skeleton placement to prevent CLS
-6. **Client-Side State** (if needed) — Add global providers with `useReducer` for shared state like audio players or carts
-7. **Navigation** — Set up NavLink with inline scripts, search without `useSearchParams`
-8. **View Transitions** — Add shared element morphing, list identity animations, and persistent element exclusions as a final enhancement
+- **Static shell**: synchronous content, `'use cache'` components, and Suspense fallbacks are prerendered at build time
+- **Dynamic holes**: async components that access uncached data stream in at request time behind `<Suspense>` boundaries
+- **The key constraint**: any component that does async work without `'use cache'` must be wrapped in `<Suspense>`, or you get a build error
+- Pages should stay synchronous. Use `params.then()` instead of `await params` to avoid pulling the entire page out of the static shell
 
-## Cache Components
+## Step 1: Locate or create the feature folder
 
-With [`cacheComponents: true`](https://nextjs.org/docs/app/api-reference/config/next-config-js/cacheComponents) enabled, Next.js uses [Partial Prerendering (PPR)](https://nextjs.org/docs/app/getting-started/caching#how-rendering-works): it builds a static shell at build time and streams dynamic content at request time.
-
-This changes how rendering works:
-
-- **Static shell**: synchronous content, `'use cache'` components, and Suspense fallbacks are prerendered into HTML at build time
-- **Dynamic holes**: async components that access uncached data (database queries, cookies, headers) stream in at request time behind `<Suspense>` boundaries
-- **The key constraint**: any component that does async work without `'use cache'` **must** be wrapped in `<Suspense>`, or you get an ["Uncached data was accessed outside of \<Suspense\>"](https://nextjs.org/docs/messages/blocking-route) error during dev and build
-- Pages should stay synchronous — use `params.then()` instead of `await params` to avoid pulling the entire page out of the static shell
-
-The architecture in this skill is designed around this model: feature components fetch their own data, pages wrap them in Suspense, and the static shell renders instantly while dynamic content streams in. For the full mental model, see the [Streaming](https://nextjs.org/docs/app/guides/streaming) guide.
-
-## Step 1: Set Up the Project Structure
+Check if the domain already has a feature folder under `features/`. If it does, use it. If not, create one:
 
 ```
-app/                    Pages and layouts (composition only)
-components/
-  ui/                   Visual primitives (Skeleton, Button, Crossfade, Spinner)
-  scripts/              Inline pre-paint scripts
-features/
-  <domain>/
-    <domain>-queries.ts  Server-only queries with 'use cache'
-    <domain>-actions.ts  Server actions with 'use server'
-    components/          Domain UI — self-contained, data-fetching components
-    hooks/               Domain-specific client hooks (optional)
-providers/              Global client-side context (optional, for apps needing shared state)
-hooks/                  Shared client hooks
-types/                  Domain types with mappers from ORM/database models
-lib/                    Database client, utilities, formatters
+features/<domain>/
+  <domain>-queries.ts   # Server-only queries with 'use cache'
+  <domain>-actions.ts   # Server actions with 'use server'
+  components/           # Self-contained async components + skeletons
 ```
 
-Not every app needs every folder. `providers/` is only needed if you have global client state (audio player, shopping cart). Some apps have none.
+If the code you're working with has domain logic scattered across pages or mixed into other folders, refactor it into this structure first. Move queries into `<domain>-queries.ts`, actions into `<domain>-actions.ts`, and components into `components/`. Pages in `app/` should only compose feature components, never contain domain logic.
 
-Feature folders are the core organizational unit. Each domain (track, playlist, genre) owns its queries, actions, and components. Pages never contain domain logic — they compose [React Server Components](https://react.dev/reference/rsc/server-components) from feature folders with [Suspense](https://react.dev/reference/react/Suspense) boundaries.
+## Step 2: Write the queries
 
-## Step 2: Build the Data Layer
-
-### Queries (`*-queries.ts`)
-
-Mark with `import 'server-only'`. Use [`'use cache'`](https://nextjs.org/docs/app/api-reference/directives/use-cache) + [`cacheTag`](https://nextjs.org/docs/app/api-reference/functions/cacheTag) + [`cacheLife`](https://nextjs.org/docs/app/api-reference/functions/cacheLife). Add `delay()` for demo visibility of loading states.
-
-**Every query must be wrapped in [`cache()`](https://react.dev/reference/react/cache)** for request deduplication. Without it, the same query called from multiple components in the same render will hit the database multiple times. `cache()` is a React function that memoizes async results per request — if `getTrack('t1')` is called from both a detail component and a sidebar, it only executes once.
-
-Use `'use cache: private'` for queries that read per-user data (cookies, sessions) — this scopes the cache to the individual user.
+Create `<domain>-queries.ts`. Mark it with `import 'server-only'`. Wrap every query in `cache()` from React for request deduplication. Without it, the same query called from multiple components in the same render will hit the database multiple times. Add `'use cache'` + `cacheTag` + `cacheLife`.
 
 ```tsx
 import 'server-only';
 import { cacheLife, cacheTag } from 'next/cache';
 import { cache } from 'react';
 
-// Per-user query (reads cookies → 'use cache: private')
-export const getCurrentUserHandle = cache(async (): Promise<string> => {
-  'use cache: private';
-  const store = await cookies();
-  return store.get('session')?.value ?? 'default';
-});
-
-// Shared query (same for all users → 'use cache')
-export const getItems = cache(async (): Promise<Item[]> => {
+export const getFeed = cache(async (userId: string) => {
   'use cache';
-  cacheTag('items');
+  cacheTag('feed', `feed-${userId}`);
   cacheLife('seconds');
-  await delay(700);
-  const rows = await db.item.findMany();
-  return rows.map(toItem);
+  return db.post.findMany({ where: { userId } });
 });
 ```
 
-### Actions (`*-actions.ts`)
+If the query reads cookies or session data, use `'use cache: private'` to scope the cache per user.
 
-Mark with [`'use server'`](https://react.dev/reference/rsc/use-server). Server actions are reachable via direct POST requests — always verify auth and validate input inside every action, not just in the UI. See the [Data Security](https://nextjs.org/docs/app/guides/data-security) guide for recommended patterns.
+Define clean domain types in `types/` with a mapper from your DB layer. Components should only see domain types, not ORM types.
 
-- **Authenticate** — verify the user's session before performing any mutation
-- **Validate** — parse and validate input at the boundary (e.g., with a schema validation library like Zod)
-- **Authorize** — check the user has permission (e.g., owns the resource)
-- **Invalidate** — call [`updateTag()`](https://nextjs.org/docs/app/api-reference/functions/unstable_updateTag) to revalidate cached data
+Persistent per-user state belongs in the database, not `localStorage`. "Last seen" timestamps, read/unread flags, dismissed banners: store them server-side as soon as the state needs to survive across browsers, accounts, or tab switches. `localStorage` is fine for genuinely client-only state (a sidebar collapsed flag, a draft autosave), but the moment another account or device should see the same state, move it to the DB.
 
-React 19 [form actions](https://react.dev/reference/react-dom/components/form#props) reset the form automatically after a successful server action — don't manually reset with `useRef` + `formRef.current?.reset()`.
+## Step 3: Write the actions
 
-Return `{ ok, error }` from actions so the client can respond. Use `redirect()` for navigation-on-success. Use `notFound()` for missing resources. For validation failures or domain errors, return an error message — never throw:
+Create `<domain>-actions.ts`. Mark with `'use server'`. Always verify auth and validate input inside the action. Call `updateTag()` to invalidate the matching cache tags. Return `{ ok, error }`.
 
 ```tsx
 'use server';
-export async function createPlaylist(formData: FormData) {
-  const user = await verifyUser(); // auth check in data layer
-
-  const parsed = schema.safeParse({ name: formData.get('name') });
+export async function createPost(formData: FormData) {
+  const user = await verifyUser();
+  const parsed = schema.safeParse({ body: formData.get('body') });
   if (!parsed.success) return { error: parsed.error.issues[0].message, ok: false as const };
 
-  await db.playlist.create({ data: { name: parsed.data.name, userId: user.id } });
-  updateTag('playlists');
+  await db.post.create({ data: { body: parsed.data.body, userId: user.id } });
+  updateTag('feed');
   return { ok: true as const };
 }
 ```
 
-### Types (`types/*.ts`)
+The `cacheTag` in the query and the `updateTag` in the action live in the same feature folder. This is the full cycle: tag, cache, invalidate.
 
-Define clean domain types and a mapper from your database/ORM layer. Keep database-specific types out of components — components should only see your domain types.
+## Step 4: Build the component
+
+Create an async server component in `features/<domain>/components/`. Before building a new component, check if there's already a reusable one in the same feature folder that does what you need. If there is, use it. If not, create one that calls its own query and renders the result. Export a skeleton from the same file.
+
+Default to async server components. They `await` their own queries directly. Don't reach for `use()` until you actually need a client component:
 
 ```tsx
-export type Item = { id: string; title: string /* ... */ };
-export function toItem(row: DbItem): Item {
-  /* map fields */
+import { getUnreadNotificationCount } from '@/features/notifications/notifications-queries';
+
+export async function NotificationsBadge() {
+  const count = await getUnreadNotificationCount();
+  if (count === 0) return null;
+  return <span aria-label={`${count} unread`}>{count}</span>;
 }
 ```
 
-## Step 3: Build Feature Components
-
-Each feature component is a self-contained [async server component](https://react.dev/reference/rsc/server-components) — it fetches its own data, owns its skeleton, and can be composed from any page. Export the skeleton alongside the component.
-
-Feature components receive plain resolved values as props (strings, IDs) — never `Promise<params>` or `searchParams`. The page is responsible for resolving those via `.then()` and passing the extracted values down.
-
 ```tsx
-// features/track/components/most-played.tsx
-export async function MostPlayed() {
-  const tracks = await getRecentlyPlayed(8);
-  return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-      {tracks.map(track => (
-        <AlbumCard key={track.id} track={track} />
-      ))}
-    </div>
-  );
-}
-
-export function MostPlayedSkeleton() {
-  return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <AlbumCardSkeleton key={i} />
-      ))}
-    </div>
-  );
-}
-```
-
-### Skeleton design rules
-
-Skeletons represent the shape of the real content. Getting them wrong causes CLS.
-
-1. Match the exact layout — same flex direction, gaps, padding, responsive breakpoints as the real component
-2. Responsive skeletons: if the real component uses `flex-col sm:flex-row`, the skeleton must too
-3. Include all structural elements — avatar circles, action button placeholders, image squares, icon button circles
-4. Use matching size classes — if the real image is `h-40 w-40 sm:h-48 sm:w-48`, the skeleton must be too
-5. Include placeholder circles for action buttons (favorite, menu, delete) — not just content shapes. A row with a heart button and playlist button needs two skeleton circles at the end
-6. Responsive visibility must match — if play count is `hidden sm:block` in the real component, the skeleton for it must also be `hidden sm:block`
-7. Don't include skeletons for inner Suspense content — that's handled by the component's own inner boundary
-8. Skeleton components should be co-located with their real component and exported alongside it
-9. Use a flat, non-animated `skeleton-subtle` CSS class for large placeholder areas (album art, cover images). The standard wave animation is distracting at large sizes. Support dark mode with the `.dark` class selector:
-
-```css
-.skeleton-animation.skeleton-subtle {
-  background: rgba(0, 0, 0, 0.06);
-  background-size: unset;
-  animation: none;
-}
-
-:is(.dark) .skeleton-animation.skeleton-subtle {
-  background: rgba(255, 255, 255, 0.06);
-}
-```
-
-### Interactive list spacing
-
-Use a small gap (`gap-0.5` / 2px) on vertical list containers of interactive rows so hover/active backgrounds don't merge into a single block. This is cheaper than adding margin to each item and keeps the list visually dense while giving each row a distinct highlight:
-
-```tsx
-<div className="flex flex-col gap-0.5">
-  {items.map(item => <InteractiveRow key={item.id} item={item} />)}
-</div>
-```
-
-## Step 4: Decide Client Boundaries
-
-Push [`'use client'`](https://react.dev/reference/rsc/use-client) as deep as possible. Most components stay as server components. Only add `'use client'` when you need hooks, event handlers, or browser APIs. Keep server components focused on data fetching and pass interactive pieces as children to client wrappers.
-
-### When to use `'use client'`
-
-- Event handlers (`onClick`, `onChange`)
-- React hooks ([`useState`](https://react.dev/reference/react/useState), [`useTransition`](https://react.dev/reference/react/useTransition), [`useOptimistic`](https://react.dev/reference/react/useOptimistic))
-- Browser APIs (`AudioContext`, `window.location`)
-- Context consumers (`useContext`)
-
-### When NOT to use `'use client'`
-
-- Pure markup, SVG icons
-- Components that only receive and render props
-- Components that use [`<ViewTransition>`](https://react.dev/reference/react/ViewTransition) (works in server components)
-
-### Grouping client components
-
-Group related small client components into one file when they're always used together and individually trivial:
-
-```tsx
-// track-interactions.tsx — 'use client'
-// TrackPlayRow (click-to-play wrapper)
-// TrackLink (navigable title with stopPropagation)
-// FavoriteButton (heart toggle with useOptimistic)
-```
-
-A server component like `TrackRow` renders these as children without needing `'use client'` itself.
-
-### Optimistic updates and toast feedback
-
-Use [`useOptimistic`](https://react.dev/reference/react/useOptimistic) for instant UI feedback on mutations (like toggling a favorite). The optimistic state reverts automatically if the action fails. Name action props with the `Action` suffix to signal they run inside a [transition](https://react.dev/reference/react/useTransition#exposing-action-props-from-components). For a full walkthrough of optimistic UI, action props, `useActionState`, and `data-pending` patterns, see the [Interactive Apps](https://nextjs.org/docs/app/guides/interactive-apps) guide.
-
-On the client, use toast notifications to surface the `{ ok, error }` result from server actions. If the project already uses a toast library, use that — otherwise pick one (e.g., sonner, react-hot-toast).
-
-**Skip success toasts when optimistic UI already provides feedback.** If a toggle immediately flips via `useOptimistic`, the user can see it worked — a success toast is redundant noise. Only toast on error so the user knows something went wrong:
-
-```tsx
-startTransition(async () => {
-  setOptimisticFavorite(!optimisticFavorite);
-  const result = await toggleFavorite(trackId);
-  if (result?.error) toast.error(result.error);
-});
-```
-
-For non-optimistic mutations where the user can't see the result (e.g., creating a resource, deleting with redirect), always toast on success.
-
-### Destructive actions with confirmation
-
-For destructive actions like deleting a resource, use a confirm dialog. Don't use `redirect()` in the server action — it throws and prevents the client from showing a toast or closing the dialog. Instead, return `{ ok: true }` and handle navigation client-side:
-
-```tsx
-// Server action — returns result, no redirect
-export async function deletePlaylist(id: string) {
-  await db.playlist.delete({ where: { id } });
-  updateTag('playlists');
-  return { ok: true as const };
-}
-
-// Client — confirm dialog with toast + router.push
-const router = useRouter();
-async function handleConfirm(): Promise<boolean> {
-  const result = await deletePlaylist(playlistId);
-  if (result?.error) {
-    toast.error(result.error);
-    return false; // keep dialog open
-  }
-  toast.success('Playlist deleted');
-  router.push('/playlists');
-  return true; // close dialog
-}
-```
-
-### Passing promises to client components with `use()`
-
-When a client component needs server data but should own its own loading state (e.g., a popover that fetches on mount), pass the promise from the server and resolve it client-side with [`use()`](https://react.dev/reference/react/use). Wrap the `use()` call in `<Suspense>` for the loading fallback:
-
-```tsx
-// Server component — starts the fetch, passes promise
-<AddToPlaylistMenu trackId={track.id} itemsPromise={getPlaylistMenuItems(track.id)} />
-
-// Client component — resolves with use() inside Suspense
-function AddToPlaylistMenu({ trackId, itemsPromise }: { trackId: string; itemsPromise: Promise<Item[]> }) {
-  return (
-    <Popover>
-      <Suspense fallback={<MenuSkeleton />}>
-        <MenuItems trackId={trackId} itemsPromise={itemsPromise} />
-      </Suspense>
-    </Popover>
-  );
-}
-
-function MenuItems({ trackId, itemsPromise }: { trackId: string; itemsPromise: Promise<Item[]> }) {
-  const items = use(itemsPromise);
-  return <ToggleMenu items={items} toggleAction={...} />;
-}
-```
-
-This avoids creating a thin server component wrapper that does nothing except pass the promise — the caller starts the fetch directly.
-
-## Step 5: Compose Pages with Suspense
-
-Pages define the loading experience. They compose feature components with [Suspense](https://react.dev/reference/react/Suspense) boundaries. Pages never fetch data directly. Section headings belong in pages, not feature components — the same component might need different titles on different pages.
-
-Every page exports `unstable_prefetch = 'force-runtime'` so navigations are backed by fresh server-rendered data. See the [Prefetching](https://nextjs.org/docs/app/guides/prefetching) guide for how runtime prefetching works.
-
-### Skeleton placement rules
-
-1. The first section gets its own Suspense with a skeleton fallback — it has a known, predictable height
-2. The second section's heading goes **outside** its Suspense (in the static shell), and the Suspense gets a skeleton fallback for the content
-3. If the second section has variable height, group everything below it **inside the same Suspense** — you can show a skeleton for the variable-height content itself, but you can't show anything below it at a fixed position
-4. If a section has **fixed height** (deterministic count from a known query like `getTopGenres(6)`, each item a fixed-size card), it's safe to give it its own Suspense boundary — the skeleton will match the resolved height exactly, so content below it won't shift
-5. Wrap Suspense content in `<Crossfade>` (a [`<ViewTransition>`](https://react.dev/reference/react/ViewTransition) wrapper) for smooth reveal animations
-6. Show **fewer skeleton items** than the expected real count for variable-length lists — enough to convey the shape (2–5 items), not the full count. For fixed-count sections, match the count exactly to prevent CLS
-5. Sections that only appear after variable-height content resolves don't need their own skeletons — they stream in together
-
-```tsx
-export const unstable_prefetch = 'force-runtime';
-
-export default function HomePage() {
-  return (
-    <div className="px-6 py-6 sm:px-8">
-      <h1 className="mb-6 text-3xl font-bold">Good evening</h1>
-      {/* First section — known height, own skeleton */}
-      <Suspense fallback={<QuickPlayGridSkeleton />}>
-        <Crossfade>
-          <QuickPlayGrid />
-        </Crossfade>
-      </Suspense>
-      {/* Heading outside Suspense — visible in static shell */}
-      <h2 className="mt-10 mb-4">Most Played</h2>
-      {/* Variable-height content with skeleton + everything below grouped together */}
-      <Suspense fallback={<MostPlayedSkeleton />}>
-        <Crossfade>
-          <MostPlayed />
-          <section className="mt-10">
-            <h2 className="mb-4">Your Playlists</h2>
-            <PlaylistBrowse />
-          </section>
-          <section className="mt-10">
-            <h2 className="mb-4">Browse Genres</h2>
-            <TopGenresGrid />
-          </section>
-        </Crossfade>
-      </Suspense>
-    </div>
-  );
-}
-```
-
-### Detail pages with variable-height content
-
-Group the detail component and sections below it in one Suspense:
-
-```tsx
-<Suspense fallback={<PlaylistDetailSkeleton />}>
-  <Crossfade>
-    <PlaylistDetail id={id} />
-    <section className="mt-10">
-      <h2>Other Playlists</h2>
-      <OtherPlaylists excludeId={id} />
-    </section>
-  </Crossfade>
+<Suspense>
+  <NotificationsBadge />
 </Suspense>
 ```
 
-### Inner vs outer skeletons
+Only pass a promise + use `use()` when the consumer must be a client component (it needs hooks, event handlers, or browser APIs). In that case, name promise props with a `Promise` suffix and put a `fallback` on the Suspense matching the resolved UI, unless the component renders nothing in the empty state:
 
-Detail components can have their own inner Suspense for secondary content (e.g., "More from genre"). The page-level skeleton should NOT include the inner skeleton — it only represents what shows before the outer Suspense resolves.
+```tsx
+<Suspense fallback={<TagListSkeleton />}>
+  <TagPicker itemsPromise={getTags()} />
+</Suspense>
+```
 
-### Async params and searchParams
+```tsx
+'use client';
+import { use } from 'react';
 
-Use the generated `PageProps<'/route'>` and `LayoutProps<'/route'>` types for all page and layout function signatures — never define manual `type Props = { params: Promise<...> }`. These are global types auto-generated by Next.js from your route structure (in `.next/types/routes.d.ts`), providing type-safe params and searchParams for each specific route.
+export function TagPicker({ itemsPromise }: { itemsPromise: Promise<Tag[]> }) {
+  const items = use(itemsPromise);
+  // ...interactive logic
+}
+```
 
-Use `.then()` instead of `await` to keep pages synchronous. Inline the JSX directly in the `.then()` callback — don't create a wrapper component just to receive the resolved params:
+This keeps the boundary where it belongs and avoids redundant server wrappers, but only when interactivity actually requires the client.
+
+Group small related components into one file when they're always used together or one is the natural building block for another. Don't split a card and the grid that renders it into separate files. Examples:
+
+- `genre-card.tsx` exports `GenrePill`, `GenreCard`, `GenreGrid`, `GenreGridSkeleton`
+- `playlist-card.tsx` exports `PlaylistCard`, `PlaylistList`, `PlaylistCardSkeleton`, `PlaylistListSkeleton`
+- `track-interactions.tsx` (a `'use client'` file) exports the small interactive pieces (`PlayButton`, `FavoriteButton`, `TrackIndexCell`) used together by a server-side row component
+
+A new file should hold something with real surface area, not a two-line passthrough. If you find yourself importing a component from a sibling file that's only ever used in one place, move it in.
+
+The server/client boundary blocks some grouping. An async server component and its `'use client'` helper (a poller, an optimistic-input wrapper) cannot share a file. Keep them as siblings in the same feature folder and don't fight the boundary.
+
+Don't extract shared UI primitives prematurely. Two sidebar widgets that happen to look similar but render different data shapes (a pinned-projects row vs a recent-deploys row with status) are not the same component. The visual will diverge as soon as one needs an extra slot. Wait until at least three call sites would use the abstraction with the exact same shape before extracting.
+
+```tsx
+export async function Feed({ userId }: { userId: string }) {
+  const posts = await getFeed(userId);
+  return (
+    <ul>
+      {posts.map(p => (
+        <Post key={p.id} post={p} />
+      ))}
+    </ul>
+  );
+}
+
+export function FeedSkeleton() {
+  return (
+    <ul>
+      {Array.from({ length: 3 }).map((_, i) => (
+        <li key={i}>
+          <Skeleton className="h-24" />
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+The server component receives plain values as props (strings, IDs), never promises. It awaits its own queries internally. If it needs the current user or session data, it calls a `'use cache: private'` query rather than receiving it from the page. The component stays self-contained.
+
+Client components are different: when a client component needs server data but should own its loading state (a sidebar badge, a popover that fetches on mount), pass the unresolved promise from the server and resolve it with `use()` on the client. Wrap the consumer in `<Suspense>`.
+
+When a parent component already has the data from its own query, pass it as props instead of having the child refetch. For example, `<Feed>` fetches a list of posts and passes each `post` object to `<Post post={post} />`. There is no reason for `<Post>` to refetch its own row by id when the parent already has it.
+
+The skeleton matches the exact layout of the real component. Show fewer items than expected for variable-length lists.
+
+### Skeleton design rules
+
+1. Match the exact layout: same flex direction, gaps, padding, responsive breakpoints
+2. If the real component uses `flex-col sm:flex-row`, the skeleton must too
+3. Include all structural elements: avatar circles, action button placeholders, image squares
+4. Use matching size classes
+5. Include placeholder shapes for action buttons, not just content
+6. Responsive visibility must match (`hidden sm:block` in real = same in skeleton)
+7. Don't include skeletons for inner Suspense content
+8. Co-locate with the real component, export alongside it
+
+If the entire component output can be cached (a self-contained widget), put `'use cache'` on the component directly instead of on the query:
+
+```tsx
+async function TrendingTags() {
+  'use cache';
+  cacheTag('trending');
+  cacheLife('minutes');
+
+  const tags = await db.tag.findMany({ orderBy: { count: 'desc' }, take: 6 });
+  return (
+    <ul>
+      {tags.map(t => (
+        <li key={t.name}>#{t.name}</li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## Step 5: Decide the client boundary
+
+Push `'use client'` as deep as possible. Only add it when you need hooks, event handlers, or browser APIs.
+
+If the component needs interactive pieces, keep the server component as the parent and render client leaves:
+
+```tsx
+async function PostDetail({ id }: { id: string }) {
+  const [post, userState] = await Promise.all([getPost(id), getPostUserState(id)]);
+  return (
+    <article>
+      <PostBody body={post.body} />
+      <PostActions userState={userState} /> {/* 'use client' leaf */}
+    </article>
+  );
+}
+```
+
+Server content can flow into client components as children:
+
+```tsx
+<ComposerForm
+  avatar={
+    <Suspense fallback={<AvatarSkeleton />}>
+      <CurrentUserAvatar />
+    </Suspense>
+  }
+/>
+```
+
+The client component doesn't know where the avatar came from. Composition crosses the boundary.
+
+Use `useOptimistic` for instant feedback on mutations. Skip success toasts when the optimistic UI already shows the result. Only toast on error.
+
+For deeper patterns on building interactive client components alongside async React (coordinating `useTransition`, `useOptimistic`, `useActionState`, `data-pending`, Suspense streaming, and caching across server and client in one app), see the [Interactive Apps guide](https://nextjs.org/docs/app/guides/interactive-apps).
+
+### Live data via polling
+
+If the feature needs to reflect updates that happen on the server (other users posting, new notifications, vote counts changing), drop a `<Poller>` client component into the page:
+
+```tsx
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+
+export function Poller({ intervalMs = 5000 }: { intervalMs?: number }) {
+  const router = useRouter();
+  useEffect(() => {
+    const interval = setInterval(() => router.refresh(), intervalMs);
+    const onFocus = () => router.refresh();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [router, intervalMs]);
+  return null;
+}
+```
+
+`router.refresh()` re-renders the server components on the server. Combined with `'use cache'` + `cacheLife('seconds')`, the queries return cached data until they expire, then the next refresh picks up the new data. No WebSockets, no SSE, just the existing cache cycle.
+
+## Step 6: Compose the page
+
+Create or update the page in `app/`. The page composes components from feature folders with Suspense boundaries. It never fetches data directly.
+
+Use `params.then()` instead of `await params` to keep the page synchronous. Content above the `.then()` gets pre-rendered into the static shell. Use the generated `PageProps<'/route'>` and `LayoutProps<'/route'>` types for all page and layout function signatures.
 
 ```tsx
 // Page with params
-export default function DetailPage({ params }: PageProps<'/item/[id]'>) {
+export default function PostPage({ params }: PageProps<'/post/[id]'>) {
   return (
-    <Suspense fallback={<DetailSkeleton />}>
-      {params.then(({ id }) => <Detail id={id} />)}
-    </Suspense>
+    <div>
+      <PageHeader back title="Post" />
+      <Suspense fallback={<PostDetailSkeleton />}>
+        {params.then(({ id }) => (
+          <>
+            <PostDetail id={id} />
+            <ErrorBoundary title="Replies didn't load">
+              <Suspense fallback={<RepliesSkeleton />}>
+                <Replies postId={id} />
+              </Suspense>
+            </ErrorBoundary>
+          </>
+        ))}
+      </Suspense>
+    </div>
   );
 }
 
@@ -398,231 +297,27 @@ export default function ProfilePage({ params, searchParams }: PageProps<'/u/[han
 }
 ```
 
-### generateMetadata
+Choose boundary placement deliberately:
 
-`generateMetadata` can use `await params` — it runs before the page renders and doesn't affect the static shell:
+- Group things that should appear together in one boundary
+- Nest boundaries for slower content that should stream independently
+- Wrap fallible sections in `<ErrorBoundary>` so one failure doesn't crash the page
+- Optional: wrap content in `<ViewTransition>` for smooth reveals on Suspense resolution. See the [React View Transitions skill](https://github.com/vercel-labs/agent-skills/tree/main/skills/react-view-transitions) for patterns
 
-```tsx
-export async function generateMetadata({ params }: PageProps<'/item/[id]'>): Promise<Metadata> {
-  const { id } = await params;
-  const item = await getItem(id);
-  return { title: item.title, description: item.body };
-}
-```
+### Suspense boundary placement rules
 
-### Crossfade caveat
-
-Crossfade on small frequently-revalidating elements (sidebar lists, form-triggered list updates) may cause a visible flash between old and new content. If you observe flashing, try removing the Crossfade wrapper from that specific boundary.
+1. The first section gets its own Suspense with a skeleton fallback (known, predictable height)
+2. Section headings go outside their Suspense (in the static shell)
+3. If a section has variable height, group everything below it inside the same Suspense
+4. If a section has fixed height (deterministic count), it can have its own boundary safely
+5. Show fewer skeleton items than the expected real count for variable-length lists (2-5 items)
+6. Sections that only appear after variable-height content resolves don't need their own skeletons
+7. Detail components can have inner Suspense for secondary content. The page-level skeleton should NOT include the inner skeleton
 
 ### Layout-level Suspense
 
-Layouts can also compose feature components with Suspense — for sidebars, navigation, or persistent widgets. Wrap each in an error boundary so a failing sidebar widget doesn't break the whole page:
+Layouts can also compose feature components with Suspense for sidebars and persistent widgets. Wrap each in an error boundary so a failing widget doesn't break the whole page.
 
-```tsx
-// In layout.tsx
-<Sidebar>
-  <ErrorBoundary title="Tags unavailable" compact>
-    <Suspense fallback={<TrendingTagsSkeleton />}>
-      <Crossfade>
-        <TrendingTags />
-      </Crossfade>
-    </Suspense>
-  </ErrorBoundary>
-</Sidebar>
-```
+Add `export const unstable_prefetch = 'force-runtime'` so navigations are backed by prefetched data.
 
-### URL-based pagination
-
-For paginated feeds, use `searchParams` to control the page number and render each page as a separate Suspense boundary. Only the first page renders without Suspense (it's the initial content); subsequent pages stream in:
-
-```tsx
-export async function Feed({ page = 1 }: { page?: number }) {
-  return (
-    <ul>
-      {Array.from({ length: page }).map((_, i) => {
-        const p = i + 1;
-        return p === 1 ? (
-          <FeedPage key={p} page={p} isLast={p === page} />
-        ) : (
-          <Suspense key={p} fallback={<ListSkeleton />}>
-            <Crossfade>
-              <FeedPage page={p} isLast={p === page} />
-            </Crossfade>
-          </Suspense>
-        );
-      })}
-    </ul>
-  );
-}
-```
-
-The `LoadMore` button uses `router.push(nextPageUrl, { scroll: false })` inside a transition.
-
-### Error boundaries
-
-Use [`catchError`](https://nextjs.org/docs/app/api-reference/functions/unstable_catchError) from `next/error` for error boundaries instead of `react-error-boundary`. It handles `notFound()`, `redirect()`, and server data re-fetching correctly via `retry()` which re-fetches server component data.
-
-```tsx
-import { unstable_catchError as catchError, type ErrorInfo } from 'next/error';
-
-function ErrorFallback(props: { title?: string }, { unstable_retry: retry }: ErrorInfo) {
-  return (
-    <div>
-      <p>{props.title ?? 'Something went wrong'}</p>
-      <Button onClick={() => retry()}>Try again</Button>
-    </div>
-  );
-}
-
-export default catchError(ErrorFallback);
-```
-
-## Step 6: Add Client-Side State (If Needed)
-
-If your app has global client state (audio player, shopping cart), add a provider in `providers/`. Many apps don't need this — if there's no shared client state beyond what the server provides, skip this step.
-
-- Use [`useReducer`](https://react.dev/reference/react/useReducer) — state transitions are atomic and explicit
-- Don't use `useCallback`/`useMemo` — the [React Compiler](https://react.dev/learn/react-compiler) handles memoization
-- Keep refs for imperative handles (AudioContext, animation frames)
-- Sync state to refs via `useEffect`, never during render
-
-The provider must be `'use client'`, but its `children` remain server components. Place it in the root layout wrapping `{children}` — pages and feature components below it stay as server components. Only leaf client components call `useContext`.
-
-```tsx
-type PlayerAction =
-  | { type: 'PLAY'; track: Track; queue: Track[] }
-  | { type: 'PAUSE' }
-  | { type: 'SET_VOLUME'; volume: number }
-  | { type: 'ENDED' };
-
-function playerReducer(state: PlayerState, action: PlayerAction): PlayerState {
-  switch (action.type) {
-    case 'PLAY':
-      return { ...state, track: action.track, queue: action.queue, isPlaying: true, progress: 0 };
-    case 'ENDED':
-      return { ...state, isPlaying: false, progress: 0 };
-    // ...
-  }
-}
-```
-
-## Step 7: Set Up Navigation
-
-### Active NavLink without Suspense
-
-[`usePathname()`](https://nextjs.org/docs/app/api-reference/functions/use-pathname) triggers a Suspense boundary because it reads dynamic request data. Use `useClientPathname()` (via [`useSyncExternalStore`](https://react.dev/reference/react/useSyncExternalStore) reading `window.location.pathname`) instead to avoid this. Add an inline pre-paint script (`SeedNavLinksFromPathname`) that sets the correct active class using `data-navlink-*` attributes before the page paints. See [Preventing flash before hydration](https://nextjs.org/docs/app/guides/preventing-flash-before-hydration) for the general pattern of using inline scripts to update server-rendered HTML with client-specific values before the browser paints.
-
-### Search input without Suspense
-
-[`useSearchParams()`](https://nextjs.org/docs/app/api-reference/functions/use-search-params) also requires a Suspense boundary. Instead:
-
-- `SeedFromSearchParam` inline script to populate the input value from the URL before paint
-- `useSyncInputToSearchParam` hook for soft navigation re-syncing
-- [`useTransition`](https://react.dev/reference/react/useTransition) + `router.replace` for instant feedback with a spinner
-
-## Step 8: Add View Transitions (Enhancement)
-
-[View transitions](https://react.dev/reference/react/ViewTransition) are an enhancement layer — build everything else first. Keep them subtle. The goal is to make navigation feel smooth, not flashy. See the [Next.js View Transitions](https://nextjs.org/docs/app/guides/view-transitions) guide and the [React `<ViewTransition>` reference](https://react.dev/reference/react/ViewTransition) for API details.
-
-Recommended uses:
-
-- **Crossfade on Suspense reveal** — smooth content appearance instead of a hard swap
-- **Shared element morphs** — album art or avatar that transitions between list and detail views
-- **List identity** — items slide out on removal instead of vanishing
-- **Persistent element exclusion** — prevent layout elements from animating during navigation
-
-Avoid overusing — if every element animates, nothing feels intentional.
-
-### Persistent elements
-
-Exclude layout-persistent elements from animations with CSS:
-
-```css
-::view-transition-group(sidebar),
-::view-transition-group(mobile-nav),
-::view-transition-group(player-bar),
-::view-transition-group(theme-toggle) {
-  animation: none;
-  z-index: 100;
-}
-```
-
-### Shared element morphing
-
-Use matching `<ViewTransition name={unique-id} default="none">` on the same element in two views. Use the browser's default morph — don't add custom animation CSS unless needed.
-
-```tsx
-// Card view
-<ViewTransition name={`track-art-${track.id}`} default="none">
-  <AlbumArt size="sm" />
-</ViewTransition>
-
-// Detail view (same name → morphs)
-<ViewTransition name={`track-art-${track.id}`} default="none">
-  <AlbumArt size="lg" />
-</ViewTransition>
-```
-
-### List identity
-
-Wrap list items in `<ViewTransition key={id}>` for smooth removal animations. Wrap content below the list in `<ViewTransition>` too so it slides up when items are removed:
-
-```tsx
-// List items — each has identity for exit animation
-{
-  tracks.map(track => (
-    <ViewTransition key={track.id}>
-      <TrackRow track={track} />
-    </ViewTransition>
-  ));
-}
-
-// Content below — slides up when items are removed
-<ViewTransition>
-  <section className="mt-10">
-    <h2>Related</h2>
-    <RelatedItems />
-  </section>
-</ViewTransition>;
-```
-
-### Toasts and floating UI
-
-Apply `viewTransitionName: 'none'` to **all portal/floating-layer elements** — anything that renders outside the main document flow and can be open during a navigation. This includes: toast containers, dialog backdrops, dialog panels, popover panels, dropdown menus, command palettes, and overlays. Without this, they flicker during route view transitions.
-
-For toast libraries, also raise z-index above persistent bars:
-
-```tsx
-<Toaster
-  theme="system"
-  position="bottom-right"
-  toastOptions={{ style: { viewTransitionName: 'none' } }}
-  style={{ zIndex: 9999 }}
-/>
-```
-
-For Ariakit/Radix popovers and menus:
-
-```tsx
-<Popover style={{ viewTransitionName: 'none' }}>
-  ...
-</Popover>
-```
-
-### Confirm dialogs and transitions
-
-Don't wrap the entire server action call in `useTransition` inside a confirm dialog — it triggers view transitions on the background UI even when the action fails and the dialog stays open. Use `useState` for the pending state and only use `startTransition` for hiding the dialog on success:
-
-```tsx
-const [isPending, setIsPending] = useState(false);
-
-async function handleConfirm() {
-  setIsPending(true);
-  try {
-    const ok = await confirmAction();
-    if (ok) startTransition(() => store.hide());
-  } finally {
-    setIsPending(false);
-  }
-}
-```
+`generateMetadata` can use `await params` since it runs before the page and doesn't affect the static shell.
