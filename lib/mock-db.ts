@@ -9,7 +9,15 @@ import {
   REPOSTS,
   USERS,
 } from '@/lib/seed-data';
-import type { DbBookmark, DbDrop, DbFollow, DbLike, DbRepost, DbUser } from '@/lib/db-types';
+import type {
+  DbBookmark,
+  DbDrop,
+  DbFollow,
+  DbLike,
+  DbNotification,
+  DbRepost,
+  DbUser,
+} from '@/lib/db-types';
 
 type OrderBy = Record<string, 'asc' | 'desc'>;
 
@@ -111,6 +119,7 @@ class MockStore {
   reposts: DbRepost[] = [];
   bookmarks: DbBookmark[] = [];
   follows: DbFollow[] = [];
+  notifications: DbNotification[] = [];
 
   reset() {
     this.users = [];
@@ -119,6 +128,7 @@ class MockStore {
     this.reposts = [];
     this.bookmarks = [];
     this.follows = [];
+    this.notifications = [];
   }
 }
 
@@ -501,6 +511,75 @@ export class MockPrismaClient {
       return (
         store.follows.find(row => row.followerHandle === followerHandle && row.targetHandle === targetHandle) ?? null
       );
+    },
+  };
+
+  notification = {
+    create: async ({
+      data,
+    }: {
+      data: Pick<DbNotification, 'actorHandle' | 'kind' | 'recipientHandle'> &
+        Partial<Pick<DbNotification, 'body' | 'createdAt' | 'dropId' | 'id' | 'readAt'>>;
+    }) => {
+      const row: DbNotification = {
+        actorHandle: data.actorHandle,
+        body: data.body ?? null,
+        createdAt: data.createdAt ?? new Date(),
+        dropId: data.dropId ?? null,
+        id: data.id ?? `n-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        kind: data.kind,
+        readAt: data.readAt ?? null,
+        recipientHandle: data.recipientHandle,
+      };
+      store.notifications.push(row);
+      return row;
+    },
+    deleteMany: async () => {
+      store.notifications = [];
+      return { count: 0 };
+    },
+    findMany: async ({
+      orderBy,
+      take,
+      where,
+    }: {
+      orderBy?: OrderBy;
+      take?: number;
+      where?: { recipientHandle?: string };
+    } = {}) => {
+      let rows = store.notifications.filter(
+        row => !where?.recipientHandle || row.recipientHandle === where.recipientHandle,
+      );
+      rows = sortRows(rows, orderBy);
+      rows = take === undefined ? rows : rows.slice(0, take);
+      return rows;
+    },
+    count: async ({
+      where,
+    }: {
+      where?: { readAt?: null; recipientHandle?: string };
+    } = {}) => {
+      return store.notifications.filter(row => {
+        if (where?.recipientHandle && row.recipientHandle !== where.recipientHandle) return false;
+        if (where?.readAt === null && row.readAt !== null) return false;
+        return true;
+      }).length;
+    },
+    updateMany: async ({
+      data,
+      where,
+    }: {
+      data: Partial<Pick<DbNotification, 'readAt'>>;
+      where?: { readAt?: null; recipientHandle?: string };
+    }) => {
+      let count = 0;
+      for (const row of store.notifications) {
+        if (where?.recipientHandle && row.recipientHandle !== where.recipientHandle) continue;
+        if (where?.readAt === null && row.readAt !== null) continue;
+        if (data.readAt !== undefined) row.readAt = data.readAt;
+        count += 1;
+      }
+      return { count };
     },
   };
 

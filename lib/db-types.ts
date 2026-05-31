@@ -46,3 +46,14 @@ export type DbFollow = {
   targetHandle: string;
   createdAt: Date;
 };
+
+export type DbNotification = {
+  id: string;
+  recipientHandle: string;
+  actorHandle: string;
+  kind: string;
+  dropId: string | null;
+  body: string | null;
+  createdAt: Date;
+  readAt: Date | null;
+};
