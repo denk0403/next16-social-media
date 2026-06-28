@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "bs": "next build --no-mangling && next start",
+    "bsdev": "NODE_ENV='development' pnpm build --no-mangling && NODE_ENV='development' pnpm start",
     "start": "next start",
     "format": "prettier --write .",
     "test:e2e": "playwright test",
@@ -58,5 +60,12 @@
     "tsx": "^4.22.2",
     "typescript": "^5"
   },
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.0",
+  "workspaces": [
+    "."
+  ],
+  "overrides": {
+    "@hono/node-server": "1.19.13",
+    "postcss": "8.5.14"
+  }
 }
