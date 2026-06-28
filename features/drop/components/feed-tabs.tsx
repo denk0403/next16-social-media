@@ -7,8 +7,8 @@ import type { Route } from 'next';
 type FeedTab = 'following' | 'discover';
 
 const FEED_TABS: { label: string; value: FeedTab; href: Route }[] = [
-  { label: 'Following', value: 'following', href: '/' as Route },
-  { label: 'Discover', value: 'discover', href: '/?tab=discover' as Route },
+  { href: '/' as Route, label: 'Following', value: 'following' },
+  { href: '/?tab=discover' as Route, label: 'Discover', value: 'discover' },
 ];
 
 function parseTab(value: string | null): FeedTab {

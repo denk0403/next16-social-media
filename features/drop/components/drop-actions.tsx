@@ -3,6 +3,7 @@
 import { Bookmark, Heart, MessageCircle, Repeat2 } from 'lucide-react';
 import { useOptimistic, useTransition } from 'react';
 import { toast } from 'sonner';
+import { Boundary } from '@/components/internal/boundary';
 import { IconButton } from '@/components/ui/icon-button';
 import { toggleBookmark, toggleLike, toggleRepost } from '@/features/drop/drop-actions';
 import type { DropUserState } from '@/features/user/user-queries';
@@ -57,52 +58,54 @@ export function DropActions({ dropId, parentId, replies, reposts, likes, userSta
   }
 
   return (
-    <div className="text-gray -ml-2 flex items-center gap-1 pt-0.5" data-client="DropActions">
-      {!compact && (
+    <Boundary label="DropActions">
+      <div className="text-gray -ml-2 flex items-center gap-1 pt-0.5">
+        {!compact && (
+          <IconButton
+            label="Reply"
+            icon={<MessageCircle className="h-4 w-4" />}
+            href={`/drop/${parentId ?? dropId}` as Route}
+          >
+            <span>{formatCount(replies)}</span>
+          </IconButton>
+        )}
         <IconButton
-          label="Reply"
-          icon={<MessageCircle className="h-4 w-4" />}
-          href={`/drop/${parentId ?? dropId}` as Route}
+          label="Repost"
+          icon={<Repeat2 className="h-4 w-4" />}
+          active={optimistic.reposted}
+          activeColor="text-success"
+          hoverColor="hover:bg-success/10 hover:text-success"
+          onClick={() => {
+            toggle('reposted', () => toggleRepost(dropId));
+          }}
         >
-          <span>{formatCount(replies)}</span>
+          <span>{formatCount(reposts + optimistic.repostsDelta)}</span>
         </IconButton>
-      )}
-      <IconButton
-        label="Repost"
-        icon={<Repeat2 className="h-4 w-4" />}
-        active={optimistic.reposted}
-        activeColor="text-success"
-        hoverColor="hover:bg-success/10 hover:text-success"
-        onClick={() => {
-          toggle('reposted', () => toggleRepost(dropId));
-        }}
-      >
-        <span>{formatCount(reposts + optimistic.repostsDelta)}</span>
-      </IconButton>
-      <IconButton
-        label="Like"
-        icon={<Heart className={cn('h-4 w-4', optimistic.liked && 'fill-current')} />}
-        active={optimistic.liked}
-        activeColor="text-danger"
-        hoverColor="hover:bg-danger/10 hover:text-danger"
-        onClick={() => {
-          toggle('liked', () => toggleLike(dropId));
-        }}
-      >
-        <span>{formatCount(likes + optimistic.likesDelta)}</span>
-      </IconButton>
-      <IconButton
-        label={optimistic.bookmarked ? 'Saved' : 'Save for later'}
-        icon={<Bookmark className={cn('h-4 w-4', optimistic.bookmarked && 'fill-current')} />}
-        active={optimistic.bookmarked}
-        activeColor="text-accent"
-        hoverColor="hover:bg-accent/10 hover:text-accent"
-        onClick={() => {
-          toggle('bookmarked', () => toggleBookmark(dropId));
-        }}
-      >
-        <span className="hidden sm:inline">{optimistic.bookmarked ? 'Saved' : 'Save'}</span>
-      </IconButton>
-    </div>
+        <IconButton
+          label="Like"
+          icon={<Heart className={cn('h-4 w-4', optimistic.liked && 'fill-current')} />}
+          active={optimistic.liked}
+          activeColor="text-danger"
+          hoverColor="hover:bg-danger/10 hover:text-danger"
+          onClick={() => {
+            toggle('liked', () => toggleLike(dropId));
+          }}
+        >
+          <span>{formatCount(likes + optimistic.likesDelta)}</span>
+        </IconButton>
+        <IconButton
+          label={optimistic.bookmarked ? 'Saved' : 'Save for later'}
+          icon={<Bookmark className={cn('h-4 w-4', optimistic.bookmarked && 'fill-current')} />}
+          active={optimistic.bookmarked}
+          activeColor="text-accent"
+          hoverColor="hover:bg-accent/10 hover:text-accent"
+          onClick={() => {
+            toggle('bookmarked', () => toggleBookmark(dropId));
+          }}
+        >
+          <span className="hidden sm:inline">{optimistic.bookmarked ? 'Saved' : 'Save'}</span>
+        </IconButton>
+      </div>
+    </Boundary>
   );
 }

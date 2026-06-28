@@ -6,7 +6,7 @@ import { DropListSkeleton } from '@/features/drop/components/drop';
 import { Feed, DiscoverFeed } from '@/features/drop/components/feed';
 import { FeedTabs } from '@/features/drop/components/feed-tabs';
 
-export const unstable_prefetch = 'force-runtime';
+export const prefetch = 'allow-runtime';
 
 function parseTab(value: string | string[] | undefined): 'following' | 'discover' {
   return value === 'discover' ? 'discover' : 'following';

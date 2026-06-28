@@ -1,11 +1,11 @@
 'use server';
 
 import { updateTag } from 'next/cache';
-import { verifyUser } from '@/features/user/user-queries';
+import { verifyAuth } from '@/features/user/user-queries';
 import { prisma } from '@/lib/db';
 
 export async function markAllNotificationsRead() {
-  const me = await verifyUser();
+  const me = await verifyAuth();
   await prisma.notification.updateMany({
     data: { readAt: new Date() },
     where: { readAt: null, recipientHandle: me },

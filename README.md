@@ -14,7 +14,7 @@ The architecture follows the [Next.js App Architecture](.agents/skills/nextjs-ap
 ## Caching and Navigation
 
 - **Cache Components**: `'use cache'` per query, not per page. A feed caches for seconds, trending tags for minutes, user-specific data with `'use cache: private'`. `cacheTag` names data, `updateTag` invalidates both server and browser cache
-- **Runtime prefetching**: all pages export `unstable_prefetch = 'force-runtime'` so the framework prefetches cached dynamic data ahead of time, making even database-driven pages instant on click
+- **Partial Prefetching**: the 16.3 default that prepares the reusable App Shell of each link in viewport so navigations commit instantly. Pages opt into per-request prefetching with `export const prefetch = 'allow-runtime'`, and `<Link>` components pass `prefetch={true}` to also prefetch link-specific data behind params, searchParams, or `'use cache: private'`
 
 ## Getting Started
 

@@ -73,6 +73,7 @@ async function NotificationRow({ notification }: { notification: Notification })
 
   return (
     <Link
+      prefetch={true}
       href={href}
       className={`border-divider/70 dark:border-divider-dark/70 hover:bg-card dark:hover:bg-card-dark flex items-start gap-3 border-b px-4 py-4 transition-colors sm:px-5 ${notification.read ? '' : 'flash-in'}`}
     >

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
   title: 'Trending Tags',
 };
 
-export const unstable_prefetch = 'force-runtime';
+export const prefetch = 'allow-runtime';
 
 export default function TagsPage() {
   return (

@@ -23,6 +23,7 @@ export function IconButton({ label, icon, href, active, activeColor, hoverColor,
   if (href) {
     return (
       <Link
+        prefetch={true}
         href={href}
         aria-label={label}
         onClick={e => {

@@ -3,14 +3,11 @@ import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
   cacheComponents: true,
   experimental: {
-    cachedNavigations: true,
-    instantInsights: {
-      validationLevel: 'warning',
-    },
-    instantNavigationDevToolsToggle: true,
+    inlineCss: true,
     useOffline: true,
     viewTransition: true,
   },
+  partialPrefetching: true,
   reactCompiler: true,
   typedRoutes: true,
 };

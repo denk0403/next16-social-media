@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useOptimistic, useTransition } from 'react';
+import { Boundary } from '@/components/internal/boundary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import type { Route } from 'next';
@@ -19,38 +20,40 @@ export function Tabs<T extends string>({ tabs, active, label = 'Sections' }: Pro
   const [isPending, startTransition] = useTransition();
 
   return (
-    <nav
-      className="border-divider/70 dark:border-divider-dark/70 flex border-b text-sm"
-      aria-label={label}
-      data-client="Tabs"
-      data-pending={isPending ? '' : undefined}
-    >
-      {tabs.map(t => {
-        const isActive = optimisticActive === t.value;
-        return (
-          <Link
-            key={t.value}
-            href={t.href}
-            onNavigate={() => {
-              if (t.value === optimisticActive) return;
-              startTransition(() => {
-                setOptimisticActive(t.value);
-              });
-            }}
-            aria-current={isActive ? 'page' : undefined}
-            className={cn(
-              'hover:bg-card dark:hover:bg-card-dark relative flex-1 px-4 py-4 text-center transition-colors',
-              isActive ? 'font-semibold text-black dark:text-white' : 'text-gray font-medium',
-            )}
-          >
-            {t.label}
-            {isActive ? (
-              <span className="absolute inset-x-6 -bottom-px h-1 rounded-t-full bg-black dark:bg-white" aria-hidden />
-            ) : null}
-          </Link>
-        );
-      })}
-    </nav>
+    <Boundary label="Tabs">
+      <nav
+        className="border-divider/70 dark:border-divider-dark/70 flex border-b text-sm"
+        aria-label={label}
+        data-pending={isPending ? '' : undefined}
+      >
+        {tabs.map(t => {
+          const isActive = optimisticActive === t.value;
+          return (
+            <Link
+              prefetch={true}
+              key={t.value}
+              href={t.href}
+              onNavigate={() => {
+                if (t.value === optimisticActive) return;
+                startTransition(() => {
+                  setOptimisticActive(t.value);
+                });
+              }}
+              aria-current={isActive ? 'page' : undefined}
+              className={cn(
+                'hover:bg-card dark:hover:bg-card-dark relative flex-1 px-4 py-4 text-center transition-colors',
+                isActive ? 'font-semibold text-black dark:text-white' : 'text-gray font-medium',
+              )}
+            >
+              {t.label}
+              {isActive ? (
+                <span className="absolute inset-x-6 -bottom-px h-1 rounded-t-full bg-black dark:bg-white" aria-hidden />
+              ) : null}
+            </Link>
+          );
+        })}
+      </nav>
+    </Boundary>
   );
 }
 

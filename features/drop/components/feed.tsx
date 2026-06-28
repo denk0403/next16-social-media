@@ -1,12 +1,21 @@
 import { Suspense } from 'react';
 import { Crossfade } from '@/components/ui/crossfade';
+import { EmptyState } from '@/components/ui/empty-state';
 import { LoadMore } from '@/components/ui/load-more';
 import { Drop, DropListSkeleton } from '@/features/drop/components/drop';
 import { getDiscoverFeed, getFeed } from '@/features/drop/drop-queries';
-import { getCurrentUserHandle } from '@/features/user/user-queries';
 import type { Route } from 'next';
 
 export async function Feed({ page = 1 }: { page?: number }) {
+  const { drops } = await getFeed(1);
+  if (drops.length === 0) {
+    return (
+      <EmptyState
+        title="Your following feed is quiet"
+        body="Follow some people, or head to Discover to find new voices."
+      />
+    );
+  }
   return (
     <ul>
       {Array.from({ length: page }).map((_, i) => {
@@ -27,8 +36,7 @@ export async function Feed({ page = 1 }: { page?: number }) {
 }
 
 async function FeedPage({ page, isLast }: { page: number; isLast: boolean }) {
-  const handle = await getCurrentUserHandle();
-  const { drops, hasMore } = await getFeed(handle, page);
+  const { drops, hasMore } = await getFeed(page);
   return (
     <>
       {drops.map(drop => (
@@ -46,6 +54,12 @@ async function FeedPage({ page, isLast }: { page: number; isLast: boolean }) {
 }
 
 export async function DiscoverFeed({ page = 1 }: { page?: number }) {
+  const { drops } = await getDiscoverFeed(1);
+  if (drops.length === 0) {
+    return (
+      <EmptyState title="You already follow everyone" body="Nothing new to discover right now. Check back later." />
+    );
+  }
   return (
     <ul>
       {Array.from({ length: page }).map((_, i) => {
@@ -66,8 +80,7 @@ export async function DiscoverFeed({ page = 1 }: { page?: number }) {
 }
 
 async function DiscoverFeedPage({ page, isLast }: { page: number; isLast: boolean }) {
-  const handle = await getCurrentUserHandle();
-  const { drops, hasMore } = await getDiscoverFeed(handle, page);
+  const { drops, hasMore } = await getDiscoverFeed(page);
   return (
     <>
       {drops.map(drop => (

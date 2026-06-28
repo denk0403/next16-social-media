@@ -4,10 +4,11 @@ import { GeistMono } from 'geist/font/mono';
 import { GeistSans } from 'geist/font/sans';
 import { Suspense } from 'react';
 import { Toaster } from 'sonner';
-import { DemoToggles } from '@/components/demo/demo-toggles';
+import { DemoToolbar } from '@/components/demo/demo-toolbar';
+import { BoundaryProvider } from '@/components/internal/boundary-provider';
 import { MobileTabBar } from '@/components/mobile-nav';
 import { OfflineIndicator } from '@/components/offline-indicator';
-import { SeedNavLinksFromPathname } from '@/components/scripts/seed-nav-links-from-pathname';
+import { NavLinkScript } from '@/components/scripts/nav-link-script';
 import { Sidebar } from '@/components/sidebar';
 import { ThemeProvider } from '@/components/theme/theme-provider';
 import { Crossfade } from '@/components/ui/crossfade';
@@ -44,39 +45,39 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="flex min-h-[100dvh] flex-col bg-white text-black antialiased dark:bg-black dark:text-white">
         <ThemeProvider>
-          <OfflineIndicator />
-          <AppGrid>
-            <Sidebar />
-            <MainColumn>{children}</MainColumn>
-            <RightSidebar>
-              <TrendingTagsShell>
-                <ErrorBoundary title="Tags unavailable" compact>
-                  <Suspense fallback={<TrendingTagsListSkeleton />}>
-                    <Crossfade>
-                      <TrendingTagsList />
-                    </Crossfade>
-                  </Suspense>
-                </ErrorBoundary>
-              </TrendingTagsShell>
-              <WhoToFollowShell>
-                <ErrorBoundary title="No suggestions" compact>
-                  <Suspense fallback={<WhoToFollowListSkeleton />}>
-                    <Crossfade>
-                      <WhoToFollowList />
-                    </Crossfade>
-                  </Suspense>
-                </ErrorBoundary>
-              </WhoToFollowShell>
-            </RightSidebar>
-          </AppGrid>
-          <MobileTabBar />
-          <SeedNavLinksFromPathname />
-          <div className="demo-toggles fixed right-4 bottom-4 z-50 hidden items-end gap-2 sm:flex lg:right-6 lg:bottom-6">
-            <Suspense>
-              <DemoToggles />
-            </Suspense>
-          </div>
-          <Toaster theme="system" position="bottom-right" />
+          <BoundaryProvider>
+            <OfflineIndicator />
+            <AppGrid>
+              <Sidebar />
+              <MainColumn>{children}</MainColumn>
+              <RightSidebar>
+                <TrendingTagsShell>
+                  <ErrorBoundary title="Tags unavailable" compact>
+                    <Suspense fallback={<TrendingTagsListSkeleton />}>
+                      <Crossfade>
+                        <TrendingTagsList />
+                      </Crossfade>
+                    </Suspense>
+                  </ErrorBoundary>
+                </TrendingTagsShell>
+                <WhoToFollowShell>
+                  <ErrorBoundary title="No suggestions" compact>
+                    <Suspense fallback={<WhoToFollowListSkeleton />}>
+                      <Crossfade>
+                        <WhoToFollowList />
+                      </Crossfade>
+                    </Suspense>
+                  </ErrorBoundary>
+                </WhoToFollowShell>
+              </RightSidebar>
+            </AppGrid>
+            <MobileTabBar />
+            <div className="demo-toggles fixed right-4 bottom-4 z-50 hidden items-end gap-2 sm:flex lg:right-6 lg:bottom-6">
+              <DemoToolbar />
+            </div>
+            <Toaster theme="system" position="bottom-right" />
+            <NavLinkScript />
+          </BoundaryProvider>
         </ThemeProvider>
         <Analytics />
         <SpeedInsights />

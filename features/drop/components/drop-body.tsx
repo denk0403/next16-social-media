@@ -77,7 +77,12 @@ function renderText(text: string) {
         if (part.startsWith('#')) {
           const tag = part.slice(1);
           return (
-            <Link key={`${lineIdx}-${i}`} href={`/tag/${tag}`} className="text-accent relative z-20 hover:underline">
+            <Link
+              prefetch={true}
+              key={`${lineIdx}-${i}`}
+              href={`/tag/${tag}`}
+              className="text-accent relative z-20 hover:underline"
+            >
               {part}
             </Link>
           );

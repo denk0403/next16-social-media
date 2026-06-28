@@ -16,7 +16,7 @@ export function NotFoundState({ title, body, backHref, backLabel }: Props) {
       <h2 className="text-lg font-bold tracking-tight uppercase">{title}</h2>
       <p className="text-gray text-sm">{body}</p>
       {backHref ? (
-        <Link href={backHref as Route} className="text-accent text-sm hover:underline">
+        <Link prefetch={true} href={backHref as Route} className="text-accent text-sm hover:underline">
           {backLabel ?? 'Back to the feed'}
         </Link>
       ) : null}

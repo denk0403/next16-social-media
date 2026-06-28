@@ -3,9 +3,10 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 import { ThemeToggle } from '@/components/theme/theme-toggle';
 import { DropMark } from '@/components/ui/drop-mark';
-import { GitHubIcon } from '@/components/ui/github-icon';
 import ErrorBoundary from '@/components/ui/error-boundary';
-import { NavLink, NavLinkSkeleton } from '@/components/ui/nav-link';
+import { GitHubIcon } from '@/components/ui/github-icon';
+import { NavLinkSkeleton } from '@/components/ui/nav-link';
+import { NavLinkSegments as NavLink } from '@/components/ui/nav-link-segments';
 import { Skeleton } from '@/components/ui/skeleton';
 import { NewDropModal } from '@/features/drop/components/composer-modal';
 import { NotificationsBadge } from '@/features/notifications/components/notifications-badge';
@@ -15,7 +16,7 @@ import { getAllUsers, getCurrentUser, getCurrentUserHandle } from '@/features/us
 import type { Route } from 'next';
 
 const sidebarLinkClass =
-  'flex items-center justify-center gap-4 rounded-lg p-2.5 text-base tracking-tight transition-colors lg:justify-start lg:px-3 hover:bg-card dark:hover:bg-card-dark aria-[current=page]:bg-accent/10 aria-[current=page]:text-accent aria-[current=page]:dark:bg-accent/15 aria-[current=page]:font-bold aria-[current=page]:dark:text-blue-400 aria-[current=page]:[&_svg]:stroke-[2.5]';
+  'flex items-center justify-center gap-4 rounded-lg p-2.5 text-base tracking-tight transition-colors lg:justify-start lg:px-3 not-aria-[current=page]:hover:bg-card dark:not-aria-[current=page]:hover:bg-card-dark aria-[current=page]:bg-accent/10 aria-[current=page]:text-accent aria-[current=page]:dark:bg-accent/15 aria-[current=page]:font-bold aria-[current=page]:dark:text-blue-400 aria-[current=page]:[&_svg]:stroke-[2.5]';
 
 export function Sidebar() {
   return (
@@ -24,6 +25,7 @@ export function Sidebar() {
       className="peer group/sidebar sticky top-0 hidden h-dvh flex-col items-center gap-4 overflow-y-auto overscroll-y-contain px-2 py-5 sm:flex lg:items-stretch lg:px-6"
     >
       <Link
+        prefetch={true}
         href="/"
         className="inline-flex items-center gap-2 px-2 pb-2 text-2xl font-bold tracking-tight text-black dark:text-white"
         aria-label="Drop home"

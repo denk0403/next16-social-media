@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: PageProps<'/drop/[id]'>): Pro
   };
 }
 
-export const unstable_prefetch = 'force-runtime';
+export const prefetch = 'allow-runtime';
 
 export default function DropPage({ params }: PageProps<'/drop/[id]'>) {
   return (

@@ -3,7 +3,7 @@
 import { updateTag } from 'next/cache';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
-import { verifyUser } from '@/features/user/user-queries';
+import { verifyAuth } from '@/features/user/user-queries';
 import { prisma } from '@/lib/db';
 import { delay } from '@/lib/utils';
 
@@ -20,7 +20,7 @@ export async function switchUser(handle: string) {
 export async function toggleFollow(targetHandle: string) {
   await delay(100);
   const target = handleSchema.parse(targetHandle);
-  const me = await verifyUser();
+  const me = await verifyAuth();
   if (target === me) {
     return { ok: false as const };
   }
@@ -46,8 +46,8 @@ export async function toggleFollow(targetHandle: string) {
   }
   updateTag(`user-${target}`);
   updateTag(`user-${me}`);
-  updateTag(`is-following-${target}`);
-  updateTag(`who-to-follow-${me}`);
+  updateTag(`is-following:${me}:${target}`);
+  updateTag(`who-to-follow:${me}`);
   updateTag('feed');
   return { ok: true as const };
 }

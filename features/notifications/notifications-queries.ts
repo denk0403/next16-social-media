@@ -8,13 +8,16 @@ import { delay } from '@/lib/utils';
 import type { Notification, NotificationKind } from '@/types/notification';
 
 export const getNotifications = cache(async (): Promise<Notification[]> => {
-  'use cache: private';
-  cacheTag('notifications');
-  cacheLife('seconds');
+  const handle = await getCurrentUserHandle();
+  return getNotificationsForHandle(handle);
+});
+
+async function getNotificationsForHandle(handle: string): Promise<Notification[]> {
+  'use cache';
+  cacheTag('notifications', `notifications:${handle}`);
+  cacheLife('minutes');
 
   await delay(600);
-
-  const handle = await getCurrentUserHandle();
 
   const rows = await prisma.notification.findMany({
     orderBy: { createdAt: 'desc' },
@@ -31,15 +34,19 @@ export const getNotifications = cache(async (): Promise<Notification[]> => {
     kind: r.kind as NotificationKind,
     read: r.readAt !== null,
   }));
-});
+}
 
 export const getUnreadNotificationCount = cache(async (): Promise<number> => {
-  'use cache: private';
-  cacheTag('notifications');
-  cacheLife('seconds');
-
   const handle = await getCurrentUserHandle();
+  return getUnreadNotificationCountForHandle(handle);
+});
+
+async function getUnreadNotificationCountForHandle(handle: string): Promise<number> {
+  'use cache';
+  cacheTag('notifications', `notifications:${handle}`);
+  cacheLife('minutes');
+
   return prisma.notification.count({
     where: { readAt: null, recipientHandle: handle },
   });
-});
+}
